@@ -7,7 +7,7 @@
 
 % put your group number and names in the author field
 \title{\bf Exercise 2: A Reactive Agent for the Pickup and Delivery Problem}
-\author{Group \textnumero: Student 1, Student 2}
+\author{Group 39: Hugo Bonnome, Pedro Amorim}
 
 % the report should not be longer than 3 pages
 
@@ -17,8 +17,50 @@
 \section{Problem Representation}
 
 \subsection{Representation Description}
-% describe how you design the state representation, the possible actions, the reward table and the probability transition table
+% describe how you design the state representation, the possible actions, the
+% reward table and the probability transition table
+The topology $T$ is graph defined by $T = \{C, P\}$ where $C$ is the set of cities
+in the topology and $P$ the set of paths connecting these cities.
+\subsubsection{State representation}
+The state $s$ of a given agent is defined by $s = \{c, t_d, N_c\}$ where $c \in
+C$ is the city where the agent currently is, $t_d \in C \cup \{None\}$ indicates
+whether there is a task to city $d$ in $c$ (being equal to $None$ when no task
+is available) and $N_c \subseteq C$ is the set of cities that can be reached
+from $c$, in other words the neighbours of $c$.
 
+\subsubsection{Actions}
+The agent can:
+\begin{itemize}
+\item Move towards a neighbour $n$, this will be denoted $M(n)$
+
+\item Pickup a task in the current city and deliver it to the destination city,
+  this will be denoted $D(t_d)$. We assume that the agent never attempts the
+  pickup action if there is no task available in its current city.
+\end{itemize}
+
+\subsubsection{Reward}
+For the action of moving to a neighbour:
+$$R(\{c, t_d, N_c\}, M(n)) = -dist(c, n)$$
+where $n \in N_c$ and $dist(c,n)$ is the shortest path distance between $c$ and
+$n$. This value can be justified by the fact every km that we travel without a
+profit implies a loss.
+
+For the action of picking up a task and delivering it:
+$$R(\{c, t_d, N_c\}, D(t_d)) = AR(c, d) \frac{1}{dist(c, d)}$$
+with $AR(c, d)$ being the average reward from delivering a task from city
+$c$ to city $d$ which is ponderated by the distance between both cities.
+
+\subsubsection{Probability transition table}
+The action of moving towards a neighbour $n$:
+$$ p(\{c, t, N_c\}, M(n), \{n, t_d, N_n\}) = P(n,d)$$
+$$ p(\{c, t, N_c\}, M(n), \{n, None, N_n\}) = 1 - P(n,d)$$
+where $P(n,d)$ is the probability of there being a task in city $n$ whose
+destination is $d$.
+
+The action of picking up and delivering a task:
+$$ p(\{c, t_d, N_c\}, P(t_d), \{d, t_i, N_d\}) = P(d, i) $$
+$$ p(\{c, t_d, N_c\}, P(t_d), \{d, None, N_d\}) = 1 - P(d, i) $$
+where $i$ is the destination of a potential task in city $d$.
 \subsection{Implementation Details}
 % describe the implementation details of the representations above and the implementation details of the reinforcement learning algorithm you implemented
 
