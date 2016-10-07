@@ -61,11 +61,7 @@ public class ReactiveAgent implements ReactiveBehavior {
                 action = new Move(bestAction.getDestination());
                 break;
             case PICKUP:
-                if (availableTask != null) {
-                    action = new Pickup(availableTask);
-                } else {
-                    action = new Move(bestAction.getDestination());
-                }
+                action = new Pickup(availableTask);
                 break;
             default:
                 action = null;
