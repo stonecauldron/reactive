@@ -51,16 +51,15 @@ with $AR(c, d)$ being the average reward from delivering a task from city
 $c$ to city $d$ which is ponderated by the distance between both cities.
 
 \subsubsection{Probability transition table}
-The action of moving towards a neighbour $n$:
-$$ p(\{c, t, N_c\}, M(n), \{n, t_d, N_n\}) = P(n,d)$$
-$$ p(\{c, t, N_c\}, M(n), \{n, None, N_n\}) = 1 - P(n,d)$$
-where $P(n,d)$ is the probability of there being a task in city $n$ whose
-destination is $d$.
+The uncertainty in the world state only comes from the presence of a task in a
+given city or not. It does not depend on the type of action taken by the agent.
 
-The action of picking up and delivering a task:
-$$ p(\{c, t_d, N_c\}, P(t_d), \{d, t_i, N_d\}) = P(d, i) $$
-$$ p(\{c, t_d, N_c\}, P(t_d), \{d, None, N_d\}) = 1 - P(d, i) $$
-where $i$ is the destination of a potential task in city $d$.
+$$ p(\{c, t, N_c\}, (M(n)|P(n)), \{n, t_d, N_n\}) = P(n,d)$$
+$$ p(\{c, t, N_c\}, (M(n)|P(n)), \{n, None, N_n\}) = probNoTask(n)$$
+where $P(n,d)$ is the probability of there being a task in city $n$ whose
+destination is $d$ and $probNoTask(n)$ is the probability of city $n$ having no
+task which can be computed by $1 - \Sigma_{c \in C} P(n, c)$.
+
 \subsection{Implementation Details}
 % describe the implementation details of the representations above and the implementation details of the reinforcement learning algorithm you implemented
 
