@@ -1,237 +1,316 @@
 package reactive;
 
 import logist.task.TaskDistribution;
+import logist.topology.Topology;
 import logist.topology.Topology.City;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+
 
 enum ActionType {
     MOVE,
     PICKUP
 }
 
-class State {
-    private City currentCity, taskDestination;
-    private List<City> neighbours;
 
-    public State(City c, City td, List<City> n) {
-        this.currentCity = c;
-        this.taskDestination = td;
-        this.neighbours = n;
-    }
 
-    static Set<State> generateAllStates(List<City> cities) {
-        Set<State> S = new HashSet<>();
 
-        for (City current : cities) {
-            // add also null destinations
-            S.add(new State(current, null, current.neighbors()));
-            for (City destination : cities) {
-                if (current != destination) {
-                    S.add(new State(current, destination, current.neighbors()));
-                }
-            }
-        }
-        return S;
-    }
+class ActionEdge {
 
-    static Set<State> generateAllNextStates(State current, ReactiveAction action, List<City> cities) {
-        Set<State> S = new HashSet<>();
-        City destination = action.getDestination();
-
-        // state where there is no task present
-        S.add(new State(destination, null, destination.neighbors()));
-
-        // add state where there is a task for all possible cities
-        for (City taskDestination : cities) {
-            if (taskDestination != destination) {
-                S.add(new State(destination, taskDestination, destination.neighbors()));
-            }
-        }
-        return S;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        State state = (State) o;
-
-        if (!currentCity.equals(state.currentCity)) return false;
-        if (taskDestination != null ? !taskDestination.equals(state.taskDestination) : state.taskDestination != null)
-            return false;
-        return neighbours.equals(state.neighbours);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = currentCity.hashCode();
-        result = 31 * result + (taskDestination != null ? taskDestination.hashCode() : 0);
-        result = 31 * result + neighbours.hashCode();
-        return result;
-    }
-
-    City getCurrentCity() {
-        return currentCity;
-    }
-
-    boolean hasTask() {
-        return taskDestination != null;
-    }
-
-    City getTaskDestination() {
-        return taskDestination;
-    }
-}
-
-class ActionValue {
-    private ReactiveAction action;
-    private Double value;
-
-    ActionValue(ReactiveAction action, Double value) {
-        this.action = action;
-        this.value = value;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        ActionValue that = (ActionValue) o;
-
-        if (!action.equals(that.action)) return false;
-        return value.equals(that.value);
-
-    }
-
-    @Override
-    public int hashCode() {
-        int result = action.hashCode();
-        result = 31 * result + value.hashCode();
-        return result;
-    }
-
-    ReactiveAction getAction() {
-        return action;
-    }
-
-    Double getValue() {
-        return value;
-    }
-}
-
-class ReactiveAction {
-    private ActionType type;
+    private State fromState;
+    private TaskDistribution taskDistribution;
+    private ActionType actionType;
     private City destination;
 
-    ReactiveAction(ActionType type, City destination) {
-        this.type = type;
+
+    public ActionEdge(State state, ActionType action, City destination, TaskDistribution distribution) {
+        this.actionType = action;
         this.destination = destination;
+        this.fromState = state;
+        this.taskDistribution = distribution;
     }
 
-    static Set<ReactiveAction> generateActionsForState(List<City> cities, State s) {
-        Set<ReactiveAction> A = new HashSet<>();
-        for (ActionType type : ActionType.values()) {
-            if (type == ActionType.MOVE) {
-                // only generate Moves to neighbours of the current city
-                for (City destination : s.getCurrentCity().neighbors()) {
-                    A.add(new ReactiveAction(type, destination));
-                }
-            } else if (type == ActionType.PICKUP) {
-                // only generate pickup action if there is a task avalaible
-                if (s.getTaskDestination() != null) {
-                    A.add(new ReactiveAction(type, s.getTaskDestination()));
-                }
-            }
-        }
-        return A;
+    public ActionType getActionType() {
+        return actionType;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        ReactiveAction that = (ReactiveAction) o;
-
-        if (type != that.type) return false;
-        return destination.equals(that.destination);
-
-    }
-
-    @Override
-    public int hashCode() {
-        int result = type.hashCode();
-        result = 31 * result + destination.hashCode();
-        return result;
-    }
-
-    City getDestination() {
+    public City getDestination(){
         return destination;
     }
 
-    ActionType getType() {
-        return type;
-    }
-}
+    public Double getImmediateReward(){
 
-class RewardTable {
-    private TaskDistribution td;
-
-    RewardTable(TaskDistribution td) {
-        this.td = td;
-    }
-
-    double getReward(State s, ReactiveAction a) {
-        City currentCity = s.getCurrentCity();
-        City destination = a.getDestination();
-
-        switch (a.getType()) {
+        switch (getActionType()) {
             case MOVE:
-                return -currentCity.distanceTo(destination);
+                return -fromState.getCity().distanceTo(getDestination());
 
             case PICKUP:
-                double averageReward = td.reward(currentCity, destination);
-                return averageReward * (1 / currentCity.distanceTo(destination));
+                double reward = taskDistribution.reward(fromState.getCity(), getDestination());
+                return reward / fromState.getCity().distanceTo(getDestination());
 
             default:
                 return 0.0;
         }
-    }
-}
 
-class ProbabilityTransitionTable {
-    private List<City> cities;
-    private TaskDistribution td;
-
-    ProbabilityTransitionTable(List<City> cities, TaskDistribution td) {
-        this.cities = cities;
-        this.td = td;
     }
 
-    double getProbability(State initialState, ReactiveAction a, State endState) {
-        City destination = a.getDestination();
-        City taskDestination = endState.getTaskDestination();
+    @Override
+    public boolean equals(Object that) {
 
-        if (endState.hasTask()) {
-            return td.probability(destination, taskDestination);
-        } else {
-            return computeProbabilityNoTask(destination);
+        return that instanceof ActionEdge
+                && ((ActionEdge)that).destination == this.destination;
+
+    }
+
+    @Override
+    public int hashCode() {
+        return actionType.hashCode() + 31*destination.hashCode();
+    }
+
+    @Override
+    public String toString(){
+        if(this.getActionType() == ActionType.MOVE){
+            return "empty vehicle : "+this.fromState.getCity()
+                    + " -> " + this.getDestination()
+                    + "// immediate reward : " + this.getImmediateReward();
+        }
+        else {
+            return "loaded vehicle : " + this.fromState.getCity()
+                    + " -> " +this.getDestination()
+                    + "// immediate reward : "+ this.getImmediateReward();
         }
     }
 
-    /**
-     * Compute the probability that there is no task in city c
-     */
-    private double computeProbabilityNoTask(City c) {
-        double acc = 0;
-        for (City other : cities) {
-            acc += td.probability(c, other);
+
+}
+
+
+
+class State {
+
+
+    private City city, taskDestination;
+    private TaskDistribution taskDistrib;
+    private List<ActionEdge> actions = null;
+
+    private ActionEdge bestAction = null;
+    private Double reward = 0.0;
+
+
+    public State(City c, City td, TaskDistribution taskDistrib) {
+        this.city = c;
+        this.taskDestination = td;
+        this.taskDistrib = taskDistrib;
+    }
+
+
+
+    public City getCity() {
+        return city;
+    }
+
+
+    public boolean hasTask() {
+        return taskDestination != null;
+    }
+
+
+    public City getTaskDestination() {
+        return taskDestination;
+    }
+
+    public List<ActionEdge> getAvailableAction(){
+
+        if(this.actions == null){
+            actions = new ArrayList<>();
+            if(this.hasTask()){
+                actions.add(new ActionEdge(this,ActionType.PICKUP,this.getTaskDestination(),taskDistrib));
+            }
+            for(City dest : this.getCity().neighbors()){
+                if(dest != this.getCity()){
+                    actions.add(new ActionEdge(this,ActionType.MOVE, dest,taskDistrib));
+                }
+            }
         }
-        return 1 - acc;
+
+        return this.actions;
+    }
+
+
+    public Double probability(){
+        return taskDistrib.probability(this.city,this.taskDestination);
+    }
+
+
+    public ActionEdge getBestAction(){
+        return bestAction;
+    }
+
+    public double getExpectedReward(){
+        return reward;
+    }
+
+
+    public double updateExpectedReward(Graph graph, Double discount){
+
+        ActionEdge bestAction = null;
+        double bestEv = -Double.MAX_VALUE;
+
+        for(ActionEdge a : getAvailableAction()){
+
+            // immediate reward from the curr action
+            double currEv = a.getImmediateReward() + discount*graph.expectedRewardIn(a.getDestination());
+
+            if(currEv > bestEv){
+                bestAction = a;
+                bestEv = currEv;
+            }
+
+        }
+
+        double diff = Math.abs(this.reward - bestEv);
+        this.bestAction = bestAction;
+        this.reward = bestEv;
+        return diff;
+
+    }
+
+    @Override
+    public boolean equals(Object that) {
+
+        return that instanceof State
+                && ((State)that).city == this.city
+                && ((State)that).taskDestination == this.taskDestination;
+
+    }
+
+
+    @Override
+    public int hashCode() {
+        return city.hashCode() + 31*(taskDestination != null ? taskDestination.hashCode() : 0);
+    }
+
+    @Override
+    public String toString(){
+        return city + (this.getTaskDestination() != null ? " has a delivered package to " + this.getTaskDestination() :
+                " has no package to deliver") + " // expected gain : " + this.getExpectedReward();
+
     }
 }
+
+
+
+
+
+class Graph {
+
+
+    private Map<City, Set<State>> states = new HashMap<>();
+    private Topology topology;
+    private TaskDistribution taskDistribution;
+    private Double maxDiff = Double.MAX_VALUE;
+
+
+    public Graph(TaskDistribution taskDistribution, Topology topology){
+
+        this.topology = topology;
+        this.taskDistribution = taskDistribution;
+
+        for (City city : topology.cities()) {
+
+            states.put(city, new HashSet<>());
+            // no task on this current city
+            states.get(city).add(new State(city, null, taskDistribution));
+
+            for (City destinationTask : topology.cities()) {
+                if (city != destinationTask) {
+                    states.get(city).add(new State(city, destinationTask, taskDistribution));
+                }
+            }
+        }
+
+    }
+
+
+    public State getState(City c, City taskDestination){
+        for(State s : getStateIt(c)){
+            if(s.getTaskDestination() == taskDestination){
+                return s;
+            }
+        }
+        return null;
+    }
+
+
+    public Iterable<State> getStateIt(City city){
+        return new Iterable<State>() {
+            @Override
+            public Iterator<State> iterator() {
+                return states.get(city).iterator();
+            }
+        };
+    }
+
+
+
+    public Iterable<State> getStateIt(){
+
+        return new Iterable(){
+            @Override
+            public Iterator iterator() {
+                return new Iterator() {
+                        Iterator<City> cityIt = topology.iterator();
+                        Iterator<State> stateItForCurrCity = new ArrayList().iterator();
+
+                        @Override
+                        public boolean hasNext() {
+                        while(!stateItForCurrCity.hasNext() && cityIt.hasNext()){
+                            stateItForCurrCity = getStateIt(cityIt.next()).iterator();
+                        }
+                        return stateItForCurrCity.hasNext();
+                    }
+
+                        @Override
+                        public State next() {
+                        return stateItForCurrCity.next();
+                    }
+                };
+            }
+        };
+
+    }
+
+
+    public double getDiff(){
+        return maxDiff;
+    }
+
+
+    public double update(double discount){
+        double maxDiff = 0;
+        for(State s : getStateIt()){
+            maxDiff = Math.max(maxDiff,s.updateExpectedReward(this,discount));
+        }
+        this.maxDiff = maxDiff;
+        return this.maxDiff;
+    }
+
+
+    public double expectedRewardIn(City c){
+        double expectedReward = 0.0;
+        for(State s : this.getStateIt(c)){
+            expectedReward += s.probability()*s.getExpectedReward();
+        }
+        return expectedReward;
+    }
+
+}
+
+
+
+
+
+
+
+
+
