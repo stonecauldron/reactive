@@ -107,7 +107,7 @@ public class ReactiveAgent implements ReactiveBehavior {
 
                     // go through all possible state transitions
                     for (State nextState : State.generateAllNextStates(s, a, topology.cities())) {
-                        qValue += discount * p.getProbability(s, a, nextState);
+                        qValue += discount * p.getProbability(s, a, nextState) * V.get(nextState).getValue();
                     }
 
                     Q.get(s).put(a, qValue);
