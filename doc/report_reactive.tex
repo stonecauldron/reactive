@@ -48,7 +48,7 @@ profit implies a loss.
 For the action of picking up a task and delivering it:
 $$R(\{c, t_d, N_c\}, D(t_d)) = AR(c, d) \frac{1}{dist(c, d)}$$
 with $AR(c, d)$ being the average reward from delivering a task from city
-$c$ to city $d$ which is ponderated by the distance between both cities.
+$c$ to city $d$ which is weighted by the distance between both cities.
 
 \subsubsection{Probability transition table}
 The uncertainty in the world state only comes from the presence of a task in a
@@ -62,130 +62,165 @@ task which can be computed by $1 - \Sigma_{c \in C} P(n, c)$.
 
 \subsection{Implementation Details}
 
-_______________________ ACTIONTYPE
-
+\subsubsection{ActionType}
 an ENUM with two Plans : MOVE or PICKUP
 
-_______________________ STATE
-
-Define a city where the state belong and a taskDestination that's represents
-a package to deliver (it can be null if their is no task in this city).
-So the state is represented by the both attributes : CITY + TASK.
-
-It implements :
--getAvailableAction() : return a list of ActionState (an edge to another city with an ActionType),
-i.e all decisions the agent could make in a given state.
--probability() : return the probability to be in the state knowing that we are in the city of the state
-i.e : proba(this.taskDestination | this.city)
-
-
-_______________________ ACTION EDGE
-
-Define an action that can be taken by an agent in a state so it's instanciated with :
-fromState + ActionType(MOVE/PICKUP) + CityDestination.
+\subsubsection{State}
+Define a city where the state belongs and a taskDestination that represents a
+package to deliver (it can be null if there is no task in this city). So the
+state is represented the both attributes : CITY + TASK.
 
 It implements :
-- getImmediateReward() : return the immediate reward associated with the action, calculated as follow :
-MOVE : -this.fromState.getCity().distanceTo(this.getDestination())
-PICKUP : this.taskDistribution.reward(fromState.getCity(), getDestination())/ this.fromState.getCity().distanceTo(this.getDestination())
+\begin{itemize}
+\item getAvailableAction() : returns a list of ActionState (an edge to another
+city with an ActionType), i.e all decisions the agent could make in a given
+state.
+\item probability() : returns the probability to be in the state knowing that we
+are in the city of the state i.e : probability(this.taskDestination | this.city)
+\end{itemize}
 
 
-_______________________ GRAPH
+\subsubsection{ActionEdge}
+Define an action that can be taken by an agent in a state so it's instantiated
+with fromState + ActionType(MOVE/PICKUP) + CityDestination.
 
+It implements :
+\begin{itemize}
+\item getImmediateReward() : return the immediate reward associated with the
+action, calculated as follow :
+\item MOVE : -this.fromState.getCity().distanceTo(this.getDestination())
+\item PICKUP : this.taskDistribution.reward(fromState.getCity(),
+getDestination())/ this.fromState.getCity().distanceTo(this.getDestination())
+\end{itemize}
+
+\subsubsection{Graph}
 It generates all possibles states and provides the following functions :
-getStateIt() : iterate over all states
-getStateIt(city) : iterate over all states in a given city
+\begin{itemize}
+\item getStateIt() : iterate over all states
+\item getStateIt(city) : iterate over all states in a given city
+\end{itemize}
 
+\subsubsection{State \& Graph}
 
-_______________________ STATE & GRAPH (continued)
+STATE contains two more attributes :
+\begin{itemize}
+\item bestAction : the most rewarded ActionState (initially null)
+\item evReward : the average expected reward of the best action (initially 0)
+\end{itemize}
 
--STATE contains two more attributes :
-bestAction : the most rewarded ActionState (initially null)
-evReward : the average expected reward of the best action (initially 0)
+GRAPH contains a method :
+\begin{itemize}
+\item expectedRewardIn(city) : returns the sum of each state's evReward
+multiplied by the state probability in the given city i.e : what will be the
+average evReward if I go to this city and if I act perfectly in this city.
+\end{itemize}
 
--GRAPH contains a method :
-expectedRewardIn(city) : return the sum of each state's evReward multiplied by the state probability in the given city
-i.e : what will be the average evReward if i go to city and if i play perfectly in this city
+STATE contains a method :
+\begin{itemize}
+\item update(discount, graph) : update evReward and bestAction by reevaluate all
+their available actions. for each availableAction take max : reward =
+availableAction.getImmediateReward() +
+discount*graph.expectedRewardIn(availableAction.getDestination()); i.e :
+immediate reward of the action + discount*weighted sum of state.reward
+\end{itemize}
 
-- STATE contains a method :
-update(discount, graph) : update evReward and bestAction by reevaluate all their available actions.
-for each availableAction take max :
-reward = availableAction.getImmediateReward() + discount*graph.expectedRewardIn(availableAction.getDestination());
-i.e : immediate reward of the action + discount*weighted sum of state.reward
+GRAPH contains a method :
+\begin{itemize}
+\item update(discount) : call for each state in the graph state.update(discount)
+\end{itemize}
 
-- GRAPH contains a method :
-update(discount) : call for each state in the graph state.update(discount)
-
-
-to make each evReward/bestAction converge to their respective values we just have to call graph.update(discount)
-until done.
-
+To make each evReward/bestAction converge to their respective values we just
+have to call graph.update(discount) until the differences between each update
+are lower than a preset threshold.
 
 \section{Results}
 % in this section, you describe several results from the experiments with your reactive agent
 
 
 \subsection{Experiment 1: Discount factor}
-Discount factor allow MDP to weight the future reward, the more the discount factor is closed to one, the more
-MDP will be efficient to gain long-term expected value.
-Before all, we think that the discount factor in this game will not have a strong influence on the average reward,
-because the rules of the world are enough simplistic to require to look far away in the future.
+Discount factor allow MDP to weight the future reward, the closer the discount
+factor is to one, the more efficient MDP will be in gaining long-term expected
+value. A priori, we think that the discount factor in this setting will not
+have a strong influence on the average reward, because the rules of the world
+are simplistic enough to not require long-term consideration of future states.
 
 \subsubsection{Setting}
 % you describe how you perform the experiment (you also need to specify the configuration used for the experiment)
-We run two experiments, the first one with a discount factor equals to 0.85 and the second one at 0.15.
+We ran two experiments, the first one with a discount factor equal to 0.85 and
+the second one at 0.15.
 \subsubsection{Observations}
 
-#REACTIVE df : 0.85 : The total profit after 16386 actions is 613281328 (average profit: 37427.152935432685)
-#REACTIVE df : 0.15 : The total profit after 16744 actions is 625253670 (average profit: 37341.95353559484)
-
-As expected the discount factor does not produce subtantial variation on the average reward,
-so we've got 37341 for a discount factor at 0.15 vs 37427 for a discount factor at 0.85 : it makes only about 0.2\% improvement.
-However it remains a relevant parameter in more complexe game like chess when one action could provide
-the best reward in short-term but lead in a dead-end-street in the long-term.
+\begin{itemize}
+\item REACTIVE df : 0.85 : The total profit after 16386 actions is 613281328
+(average profit: 37427.152935432685)
+\item REACTIVE df : 0.15 : The total profit after 16744 actions is 625253670
+(average profit: 37341.95353559484)
+\end{itemize}
+As expected the discount factor does not produce substantial variation on the
+average reward, so we have 37341 for a discount factor at 0.15 vs 37427 for a
+discount factor at 0.85 : it only makes about 0.2\% improvement. However it
+should be a more relevant parameter in more complex games like chess when one
+action could provide the best short-term reward but lead to a dead-end further
+down the road.
 
 \subsection{Experiment 2: Comparisons with the given dummy agent}
 
 \subsubsection{Setting}
 
-Let's test our agent against the dummy one that follow a basic strategy :
-1. move to a random neighbor if their is no task available or with 15\% probability if a task is provided.
-2. carry out the package otherwise.
+Let's test our agent against the dummy one that follows a basic strategy :
+
+\begin{itemize}
+\item Move to a random neighbor if there is no task available or with 15\%
+probability if a task is provided.
+\item Deliver the package otherwise.
+\end{itemize}
 
 Reactive agent : MDP based action.
-Dummy agent : given in the skeleton
+Dummy agent : Random agent given in the skeleton.
 
 \subsubsection{Observations}
-After about 19'000 actions we've got the following result :
-#DUMMY : The total profit after 18843 actions is 593389062 (average profit: 31491.220187868174)
-#REACTIVE : The total profit after 19769 actions is 738573948 (average profit: 37360.207800091055)
+After about 19'000 actions we have the following result:
+\begin{itemize}
+\item DUMMY : The total profit after 18843 actions is 593389062 (average profit:
+31491.220187868174)
+\item REACTIVE : The total profit after 19769 actions is 738573948 (average
+profit: 37360.207800091055)
+\end{itemize}
 
-Reactive agent increase his average reward by around 18\% in comparison to the dummy agent.
+The reactive agent has an average reward that is about 18\% higher in comparison
+to the dummy agent.
 
 \subsection{Experiment 3: Comparisons with modified dummy agent}
 
 \subsubsection{Setting}
-
-By intuition we tend to says that a good strategy is to always carry out a package when the state
-allows it. That's why we modified the dummy agent to always accept a work and compare the result
-with the MDP reactive one.
+An intuitive strategy would be to always deliver a package when the state allows
+it. This is the reason we modified the dummy agent to always accept a task when
+available and compared the result with the MDP reactive agent.
 
 Reactive agent : MDP based action.
-Dummy agent : pPickup is increase to 1.0 (still random when no task is provided)
+Dummy agent : pPickup was increased to 1.0 (random movement when no task is
+available)
 
 \subsubsection{Observations}
-After about 17'000 actions we've got the following result:
-#DUMMY : The total profit after 16522 actions is 612041360 (average profit: 37044.023725941166)
-#REACTIVE : The total profit after 18550 actions is 696576186 (average profit: 37551.276873315364)
+After about 17'000 actions we have the following results:
+\begin{itemize}
+\item DUMMY : The total profit after 16522 actions is 612041360 (average profit:
+37044.023725941166)
+\item REACTIVE : The total profit after 18550 actions is 696576186 (average profit:
+37551.276873315364)
+\end{itemize}
 
-Reactive agent increase his average reward by about 1\% in comparison to the dummy agent.
+The reactive agent has an average reward that is about 1\% higher in comparison
+to the dummy agent
 
-This small difference comes from the fact that all cities has the same uniform distribution of task
-and because deliver a package is ~always the best action.
+This small difference comes from the fact that all cities have the same uniform
+distribution of tasks and as such delivering a package is almost always the best
+action to take.
 
-The slight difference can be explained from the fact that our reactive agent improve his score
-by choosing better action when no work is offered in a city, in this case it will
-perfectly choose the good tradeof between taking the most closest city (low immediate cost)
-and the most centered city (best reward in the future).
+The slight difference can be explained by the fact that our reactive agent
+improved his score by choosing a better action when no work is offered in a
+city. In this case it will choose the best trade of between taking the
+closest city (low immediate cost) or the most central city. (best reward
+in the future).
 
 \end{document}
