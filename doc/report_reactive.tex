@@ -61,36 +61,131 @@ destination is $d$ and $probNoTask(n)$ is the probability of city $n$ having no
 task which can be computed by $1 - \Sigma_{c \in C} P(n, c)$.
 
 \subsection{Implementation Details}
-% describe the implementation details of the representations above and the implementation details of the reinforcement learning algorithm you implemented
+
+_______________________ ACTIONTYPE
+
+an ENUM with two Plans : MOVE or PICKUP
+
+_______________________ STATE
+
+Define a city where the state belong and a taskDestination that's represents
+a package to deliver (it can be null if their is no task in this city).
+So the state is represented by the both attributes : CITY + TASK.
+
+It implements :
+-getAvailableAction() : return a list of ActionState (an edge to another city with an ActionType),
+i.e all decisions the agent could make in a given state.
+-probability() : return the probability to be in the state knowing that we are in the city of the state
+i.e : proba(this.taskDestination | this.city)
+
+
+_______________________ ACTION EDGE
+
+Define an action that can be taken by an agent in a state so it's instanciated with :
+fromState + ActionType(MOVE/PICKUP) + CityDestination.
+
+It implements :
+- getImmediateReward() : return the immediate reward associated with the action, calculated as follow :
+MOVE : -this.fromState.getCity().distanceTo(this.getDestination())
+PICKUP : this.taskDistribution.reward(fromState.getCity(), getDestination())/ this.fromState.getCity().distanceTo(this.getDestination())
+
+
+_______________________ GRAPH
+
+It generates all possibles states and provides the following functions :
+getStateIt() : iterate over all states
+getStateIt(city) : iterate over all states in a given city
+
+
+_______________________ STATE & GRAPH (continued)
+
+-STATE contains two more attributes :
+bestAction : the most rewarded ActionState (initially null)
+evReward : the average expected reward of the best action (initially 0)
+
+-GRAPH contains a method :
+expectedRewardIn(city) : return the sum of each state's evReward multiplied by the state probability in the given city
+i.e : what will be the average evReward if i go to city and if i play perfectly in this city
+
+- STATE contains a method :
+update(discount, graph) : update evReward and bestAction by reevaluate all their available actions.
+for each availableAction take max :
+reward = availableAction.getImmediateReward() + discount*graph.expectedRewardIn(availableAction.getDestination());
+i.e : immediate reward of the action + discount*weighted sum of state.reward
+
+- GRAPH contains a method :
+update(discount) : call for each state in the graph state.update(discount)
+
+
+to make each evReward/bestAction converge to their respective values we just have to call graph.update(discount)
+until done.
+
 
 \section{Results}
 % in this section, you describe several results from the experiments with your reactive agent
 
+
 \subsection{Experiment 1: Discount factor}
-% the purpose of this experiment is to understand how the discount factor influences the result
+Discount factor allow MDP to weight the future reward, the more the discount factor is closed to one, the more
+MDP will be efficient to gain long-term expected value.
+Before all, we think that the discount factor in this game will not have a strong influence on the average reward,
+because the rules of the world are enough simplistic to require to look far away in the future.
 
 \subsubsection{Setting}
 % you describe how you perform the experiment (you also need to specify the configuration used for the experiment)
-
+We run two experiments, the first one with a discount factor equals to 0.85 and the second one at 0.15.
 \subsubsection{Observations}
-% you describe the experimental results and the conclusions you inferred from these results
 
-\subsection{Experiment 2: Comparisons with dummy agents}
-% you compare the results of your agent with two dummy agents: the random agent that was already given in the starter files and another dummy agent that you define and create. You should report the results from the simulations using the topologies given in the starter files and optionally, additional topologies that you create.
+#REACTIVE df : 0.85 : The total profit after 16386 actions is 613281328 (average profit: 37427.152935432685)
+#REACTIVE df : 0.15 : The total profit after 16744 actions is 625253670 (average profit: 37341.95353559484)
 
-\subsubsection{Setting}
-% you describe how you perform the experiment and you describe the dummy agent you created (you also need to specify the configuration used for the experiment)
+As expected the discount factor does not produce subtantial variation on the average reward,
+so we've got 37341 for a discount factor at 0.15 vs 37427 for a discount factor at 0.85 : it makes only about 0.2\% improvement.
+However it remains a relevant parameter in more complexe game like chess when one action could provide
+the best reward in short-term but lead in a dead-end-street in the long-term.
 
-\subsubsection{Observations}
-% elaborate on the observed results
-
-\vdots
-
-\subsection{Experiment n}
-% other experiments you would like to present
+\subsection{Experiment 2: Comparisons with the given dummy agent}
 
 \subsubsection{Setting}
 
+Let's test our agent against the dummy one that follow a basic strategy :
+1. move to a random neighbor if their is no task available or with 15\% probability if a task is provided.
+2. carry out the package otherwise.
+
+Reactive agent : MDP based action.
+Dummy agent : given in the skeleton
+
 \subsubsection{Observations}
+After about 19'000 actions we've got the following result :
+#DUMMY : The total profit after 18843 actions is 593389062 (average profit: 31491.220187868174)
+#REACTIVE : The total profit after 19769 actions is 738573948 (average profit: 37360.207800091055)
+
+Reactive agent increase his average reward by around 18\% in comparison to the dummy agent.
+
+\subsection{Experiment 3: Comparisons with modified dummy agent}
+
+\subsubsection{Setting}
+
+By intuition we tend to says that a good strategy is to always carry out a package when the state
+allows it. That's why we modified the dummy agent to always accept a work and compare the result
+with the MDP reactive one.
+
+Reactive agent : MDP based action.
+Dummy agent : pPickup is increase to 1.0 (still random when no task is provided)
+
+\subsubsection{Observations}
+After about 17'000 actions we've got the following result:
+#DUMMY : The total profit after 16522 actions is 612041360 (average profit: 37044.023725941166)
+#REACTIVE : The total profit after 18550 actions is 696576186 (average profit: 37551.276873315364)
+
+Reactive agent increase his average reward by about 1\% in comparison to the dummy agent.
+
+This small difference comes from the fact that all cities has the same uniform distribution of task
+and because deliver a package is ~always the best action.
+
+The slight difference can be explained from the fact that our reactive agent improve his score
+by choosing better action when no work is offered in a city, in this case it will
+perfectly choose the good tradeof between taking the most closest city (low immediate cost)
+and the most centered city (best reward in the future).
 
 \end{document}

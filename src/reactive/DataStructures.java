@@ -94,7 +94,7 @@ class State {
     private List<ActionEdge> actions = null;
 
     private ActionEdge bestAction = null;
-    private Double reward = 0.0;
+    private Double evReward = 0.0;
 
 
     public State(City c, City td, TaskDistribution taskDistrib) {
@@ -147,7 +147,7 @@ class State {
     }
 
     public double getExpectedReward(){
-        return reward;
+        return evReward;
     }
 
 
@@ -168,9 +168,9 @@ class State {
 
         }
 
-        double diff = Math.abs(this.reward - bestEv);
+        double diff = Math.abs(this.evReward - bestEv);
         this.bestAction = bestAction;
-        this.reward = bestEv;
+        this.evReward = bestEv;
         return diff;
 
     }
